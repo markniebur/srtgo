@@ -25,14 +25,14 @@ const (
 )
 
 /*
-	pollDesc contains the polling state for the associated SrtSocket
-	closing: socket is closing, reject all poll operations
-	pollErr: an error occured on the socket, indicates it's not useable anymore.
-	unblockRd: is used to unblock the poller when the socket becomes ready for io
-	rdState: polling state for read operations
-	rdDeadline: deadline in NS before poll operation times out, -1 means timedout (needs to be cleared), 0 is without timeout
-	rdSeq: sequence number protects against spurious signalling of timeouts when timer is reset.
-	rdTimer: timer used to enforce deadline.
+pollDesc contains the polling state for the associated SrtSocket
+closing: socket is closing, reject all poll operations
+pollErr: an error occured on the socket, indicates it's not useable anymore.
+unblockRd: is used to unblock the poller when the socket becomes ready for io
+rdState: polling state for read operations
+rdDeadline: deadline in NS before poll operation times out, -1 means timedout (needs to be cleared), 0 is without timeout
+rdSeq: sequence number protects against spurious signalling of timeouts when timer is reset.
+rdTimer: timer used to enforce deadline.
 */
 type pollDesc struct {
 	lock       sync.Mutex
@@ -261,6 +261,8 @@ func (pd *pollDesc) unblock(mode PollMode, pollerr, ioready bool) {
 }
 
 func (pd *pollDesc) reset(mode PollMode) {
+	pd.lock.Lock()
+	defer pd.lock.Unlock()
 	if mode == ModeRead {
 		pd.rdLock.Lock()
 		pd.rdState = pollDefault
