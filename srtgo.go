@@ -381,16 +381,49 @@ var (
 	RejectionReasonUnacceptable = RejectionReasonPredefined + 406
 
 	// Start of range for application defined rejection reasons
-	RejectionReasonUserDefined = int(C.get_srt_error_reject_predefined())
+	RejectionReasonUserDefined = int(C.get_srt_error_reject_userdefined())
 )
+
+var rejectreasons = map[int]string{
+	RejectionReasonBadRequest:   "Syntax error in SocketID specification or unknown error",
+	RejectionReasonUnauthorized: "Authentication failed",
+	RejectionReasonOverload:     "The server is too heavily loaded, or client has exceeded credits for access",
+	RejectionReasonForbidden:    "Access denied",
+	RejectionReasonNotFound:     "Resource not found at this time",
+	RejectionReasonBadMode:      "The mode specified in the `m` key in StreamID is not supported for this request",
+	RejectionReasonUnacceptable: "The requested parameters specified in SocketID cannot be satisfied for the requested " +
+		"resource. Also when m=publish and the data format is not acceptable.",
+}
 
 // SetRejectReason - set custom reason for connection reject
 func (s SrtSocket) SetRejectReason(value int) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	res := C.srt_setrejectreason(s.socket, C.int(value))
 	if res == SRT_ERROR {
 		return errors.New(C.GoString(C.srt_getlasterror_str()))
 	}
 	return nil
+}
+
+// GetRejectReason - get reason for connection reject
+func (s SrtSocket) GetRejectReason() int {
+	return int(C.srt_getrejectreason(s.socket))
+}
+
+// GetRejectReasonStr Get string from reject code
+func GetRejectReasonStr(value int) string {
+	if value < RejectionReasonPredefined {
+		return C.GoString(C.srt_rejectreason_str(C.int(value)))
+	} else if value < RejectionReasonUserDefined {
+		reason, ok := rejectreasons[value]
+		if !ok {
+			return rejectreasons[RejectionReasonBadRequest]
+		}
+		return reason
+	} else {
+		return "User defined reject reason"
+	}
 }
 
 // GetSockOptByte - return byte value obtained with srt_getsockopt

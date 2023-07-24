@@ -2,6 +2,7 @@ package srtgo
 
 import (
 	"math/rand"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -259,5 +260,48 @@ func TestSetSockOptBool(t *testing.T) {
 	}
 	if v != expected {
 		t.Errorf("Failed to set SRTO_MESSAGEAPI expected %t, got %t\n", expected, v)
+	}
+}
+
+func TestRejectReason(t *testing.T) {
+	InitSRT()
+	listening := make(chan struct{})
+	listenPort := uint16(8095)
+	listener := NewSrtSocket("localhost", listenPort, map[string]string{"transtype": "file"})
+	listener.SetListenCallback(func(socket *SrtSocket, _ int, _ *net.UDPAddr, _ string) bool {
+		socket.SetRejectReason(RejectionReasonUnacceptable)
+		return false
+	})
+	connector := NewSrtSocket("localhost", listenPort, map[string]string{"transtype": "file"})
+	wg := sync.WaitGroup{}
+	timer := time.AfterFunc(time.Second, func() {
+		t.Log("Accept timed out")
+		listener.Close()
+		connector.Close()
+	})
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-listening
+		err := connector.Connect()
+		if err == nil {
+			t.Error("Expected connection error")
+		} else if reason := connector.GetRejectReason(); reason != RejectionReasonUnacceptable {
+			t.Errorf("Unexpected rejection reason %v", GetRejectReasonStr(reason))
+		}
+	}()
+	err := listener.Listen(1)
+	if err != nil {
+		t.Error(err)
+	}
+	listening <- struct{}{}
+	go func() {
+		listener.Accept()
+	}()
+
+	wg.Wait()
+	if timer.Stop() {
+		listener.Close()
+		connector.Close()
 	}
 }
