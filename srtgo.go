@@ -276,7 +276,7 @@ func (s *SrtSocket) SetWriteDeadline(deadline time.Time) {
 }
 
 // Close the SRT socket
-func (s *SrtSocket) Close() {
+func (s *SrtSocket) Close() error {
 
 	C.srt_close(s.socket)
 	s.socket = SRT_INVALID_SOCK
@@ -291,6 +291,8 @@ func (s *SrtSocket) Close() {
 		gopointer.Unref(ptr)
 	}
 	callbackMutex.Unlock()
+
+	return nil
 }
 
 // ListenCallbackFunc specifies a function to be called before a connecting socket is passed to accept
